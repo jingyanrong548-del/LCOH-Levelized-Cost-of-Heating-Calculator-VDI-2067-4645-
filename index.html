@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCOH (平准化供热成本) 计算器 (VDI 2067 & 4645)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f6;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: all 0.3s ease-in-out;
+        }
+        .card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            transform: translateY(-4px);
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .btn-primary {
+            width: 100%;
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.875rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 1.125rem;
+            box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 14px rgba(50, 50, 93, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08);
+        }
+        .toggle-checkbox:checked {
+            background-color: #3b82f6;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <!-- 标题 -->
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-gray-800">LCOH (平准化供热成本) 计算器</h1>
+            <p class="text-lg text-gray-600 mt-2">依据 VDI 2067 & 4645 比较工业热泵与传统供热方案的经济性</p>
+        </div>
+
+        <!-- 恢复：通用参数和能源价格 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <!-- 左侧：通用参数 -->
+            <div class="card p-6">
+                <h3 class="text-2xl font-semibold mb-6 border-b pb-3 text-gray-700">1. 通用参数</h3>
+                <div class="space-y-5">
+                    <div>
+                        <label for="annualHeatDemand" class="block text-sm font-medium text-gray-700 mb-1">年总供热需求 (kWh)</label>
+                        <input type="number" id="annualHeatDemand" class="form-input" value="1000000">
+                    </div>
+                    <div>
+                        <label for="lifespan" class="block text-sm font-medium text-gray-700 mb-1">项目计算周期 (年)</label>
+                        <input type="number" id="lifespan" class="form-input" value="20">
+                    </div>
+                    <div>
+                        <label for="discountRate" class="block text-sm font-medium text-gray-700 mb-1">折现率 (%)</label>
+                        <input type="number" id="discountRate" class="form-input" value="5">
+                    </div>
+                    <div>
+                        <label for="operationDays" class="block text-sm font-medium text-gray-700 mb-1">年运行天数 (天)</label>
+                        <input type="number" id="operationDays" class="form-input" value="150">
+                    </div>
+                    <div>
+                        <label for="dailyHours" class="block text-sm font-medium text-gray-700 mb-1">日运行小时数 (小时/天)</label>
+                        <input type="number" id="dailyHours" class="form-input" value="10">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：能源价格 -->
+            <div class="card p-6">
+                <h3 class="text-2xl font-semibold mb-6 border-b pb-3 text-gray-700">2. 能源价格</h3>
+                <div class="space-y-5">
+                    <div>
+                        <label for="electricityPrice" class="block text-sm font-medium text-gray-700 mb-1">电价 (元/kWh)</label>
+                        <input type="number" id="electricityPrice" class="form-input" value="0.7">
+                    </div>
+                    <div>
+                        <label for="gasPrice" class="block text-sm font-medium text-gray-700 mb-1">天然气价格 (元/m³)</label>
+                        <input type="number" id="gasPrice" class="form-input" value="3.5">
+                    </div>
+                    <div>
+                        <label for="biomassPrice" class="block text-sm font-medium text-gray-700 mb-1">生物质颗粒价格 (元/kg)</label>
+                        <input type="number" id="biomassPrice" class="form-input" value="1.2">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 详细技术参数 (已修复和恢复) -->
+        <div class="card p-6 mb-8">
+            <h3 class="text-2xl font-semibold mb-6 border-b pb-3 text-gray-700">3. 技术设备参数</h3>
+            
+            <!-- 电热锅炉 (默认展开) -->
+            <div class="mb-4 border border-gray-200 rounded-lg">
+                <button class="accordion-toggle w-full p-4 text-left font-semibold text-lg text-gray-800 bg-gray-50 hover:bg-gray-100 rounded-t-lg transition flex justify-between items-center" data-target="#params-electric">
+                    电热锅炉
+                    <span class="transform transition-transform duration-300 rotate-180">▼</span>
+                </button>
+                <div id="params-electric" class="accordion-content p-5 grid grid-cols-1 md:grid-cols-3 gap-4 border-t" style="display: grid;">
+                    <div>
+                        <label for="capCostElectric" class="block text-sm font-medium text-gray-700 mb-1">单位投资成本 (元/kW)</label>
+                        <input type="number" id="capCostElectric" class="form-input" value="300">
+                    </div>
+                    <!-- 恢复缺失的输入框 -->
+                    <div>
+                        <label for="opexFixedElectric" class="block text-sm font-medium text-gray-700 mb-1">资本相关运维费率 (%)</label>
+                        <input type="number" id="opexFixedElectric" class="form-input" value="2">
+                    </div>
+                    <div>
+                        <label for="efficiencyElectric" class="block text-sm font-medium text-gray-700 mb-1">热效率 (%)</label>
+                        <input type="number" id="efficiencyElectric" class="form-input" value="98">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 修订：工业热泵 A (例如：余热回收) (默认展开) -->
+            <div class="mb-4 border border-gray-200 rounded-lg">
+                <button class="accordion-toggle w-full p-4 text-left font-semibold text-lg text-gray-800 bg-gray-50 hover:bg-gray-100 rounded-t-lg transition flex justify-between items-center" data-target="#params-ind-hp-a">
+                    工业热泵 A (例如：余热回收)
+                    <span class="transform transition-transform duration-300 rotate-180">▼</span>
+                </button>
+                <div id="params-ind-hp-a" class="accordion-content p-5 grid grid-cols-1 md:grid-cols-2 gap-6 border-t" style="display: grid;">
+                    <div>
+                        <label for="capCostIndHpA" class="block text-sm font-medium text-gray-700 mb-1">单位投资成本 (元/kW)</label>
+                        <input type="number" id="capCostIndHpA" class="form-input" value="2200">
+                    </div>
+                    <div>
+                        <label for="opexFixedIndHpA" class="block text-sm font-medium text-gray-700 mb-1">资本相关运维费率 (%)</label>
+                        <input type="number" id="opexFixedIndHpA" class="form-input" value="2">
+                    </div>
+                    <div>
+                        <label for="spfIndHpA" class="block text-sm font-medium text-gray-700 mb-1">全年综合性能系数 (SPF)</label>
+                        <span class="block text-xs font-normal text-gray-500 mb-1">根据 VDI 4645 或厂家数据估算</span>
+                        <input type="number" id="spfIndHpA" class="form-input" value="2.5" step="0.1">
+                    </div>
+                    <div>
+                        <label for="tSourceHpA" class="block text-sm font-medium text-gray-700 mb-1">热源平均温度 (°C)</label>
+                        <input type="number" id="tSourceHpA" class="form-input" value="30">
+                    </div>
+                    <div>
+                        <label for="tSinkHpA" class="block text-sm font-medium text-gray-700 mb-1">热汇平均温度 (°C)</label>
+                        <input type="number" id="tSinkHpA" class="form-input" value="80">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 修订：工业热泵 B (例如：环境热源) (默认展开) -->
+            <div class="mb-4 border border-gray-200 rounded-lg">
+                <button class="accordion-toggle w-full p-4 text-left font-semibold text-lg text-gray-800 bg-gray-50 hover:bg-gray-100 rounded-t-lg transition flex justify-between items-center" data-target="#params-ind-hp-b">
+                    工业热泵 B (例如：环境热源)
+                    <span class="transform transition-transform duration-300 rotate-180">▼</span>
+                </button>
+                <div id="params-ind-hp-b" class="accordion-content p-5 grid grid-cols-1 md:grid-cols-2 gap-6 border-t" style="display: grid;">
+                    <div>
+                        <label for="capCostIndHpB" class="block text-sm font-medium text-gray-700 mb-1">单位投资成本 (元/kW)</label>
+                        <input type="number" id="capCostIndHpB" class="form-input" value="2800">
+                    </div>
+                    <div>
+                        <label for="opexFixedIndHpB" class="block text-sm font-medium text-gray-700 mb-1">资本相关运维费率 (%)</label>
+                        <input type="number" id="opexFixedIndHpB" class="form-input" value="2">
+                    </div>
+                    <div>
+                        <label for="spfIndHpB" class="block text-sm font-medium text-gray-700 mb-1">全年综合性能系数 (SPF)</label>
+                        <span class="block text-xs font-normal text-gray-500 mb-1">根据 VDI 4645 或厂家数据估算</span>
+                        <input type="number" id="spfIndHpB" class="form-input" value="3.0" step="0.1">
+                    </div>
+                    <div>
+                        <label for="tSourceHpB" class="block text-sm font-medium text-gray-700 mb-1">热源平均温度 (°C)</label>
+                        <input type="number" id="tSourceHpB" class="form-input" value="10">
+                    </div>
+                    <div>
+                        <label for="tSinkHpB" class="block text-sm font-medium text-gray-700 mb-1">热汇平均温度 (°C)</label>
+                        <input type="number" id="tSinkHpB" class="form-input" value="70">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 修复：天然气锅炉 (默认折叠) -->
+            <div class="mb-4 border border-gray-200 rounded-lg">
+                <div class="w-full p-4 text-left font-semibold text-lg text-gray-800 bg-gray-50 hover:bg-gray-100 rounded-t-lg transition flex justify-between items-center">
+                    <button class="accordion-toggle flex-grow text-left" data-target="#params-gas">
+                        天然气锅炉
+                        <span class="transform transition-transform duration-300">▼</span>
+                    </button>
+                    <!-- 恢复复选框 -->
+                    <div class="flex items-center space-x-2">
+                        <label for="includeGas" class="text-sm font-medium text-gray-700">加入对比</label>
+                        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" id="includeGas" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                            <label for="includeGas" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 修复参数区域 -->
+                <div id="params-gas" class="accordion-content p-5 grid grid-cols-1 md:grid-cols-2 gap-4 border-t" style="display: none;">
+                    <div>
+                        <label for="capCostGas" class="block text-sm font-medium text-gray-700 mb-1">单位投资成本 (元/kW)</label>
+                        <input type="number" id="capCostGas" class="form-input" value="400">
+                    </div>
+                    <div>
+                        <label for="opexFixedGas" class="block text-sm font-medium text-gray-700 mb-1">资本相关运维费率 (%)</label>
+                        <input type="number" id="opexFixedGas" class="form-input" value="3">
+                    </div>
+                    <div>
+                        <label for="efficiencyGas" class="block text-sm font-medium text-gray-700 mb-1">热效率 (%)</label>
+                        <input type="number" id="efficiencyGas" class="form-input" value="90">
+                    </div>
+                    <div>
+                        <label for="heatValueGas" class="block text-sm font-medium text-gray-700 mb-1">天然气热值 (kCal/m³)</label>
+                        <input type="number" id="heatValueGas" class="form-input" value="8500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 生物质锅炉 (默认折叠) -->
+            <div class="border border-gray-200 rounded-lg">
+                <div class="w-full p-4 text-left font-semibold text-lg text-gray-800 bg-gray-50 hover:bg-gray-100 rounded-t-lg transition flex justify-between items-center">
+                    <button class="accordion-toggle flex-grow text-left" data-target="#params-biomass">
+                        生物质锅炉
+                    </button>
+                    <div class="flex items-center space-x-2">
+                        <label for="includeBiomass" class="text-sm font-medium text-gray-700">加入对比</label>
+                        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" id="includeBiomass" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                            <label for="includeBiomass" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 修改：将生物质热值移入此区域，并调整布局为 md:grid-cols-2 -->
+                <div id="params-biomass" class="accordion-content p-5 grid grid-cols-1 md:grid-cols-2 gap-4 border-t" style="display: none;">
+                    <div>
+                        <label for="capCostBiomass" class="block text-sm font-medium text-gray-700 mb-1">单位投资成本 (元/kW)</label>
+                        <input type="number" id="capCostBiomass" class="form-input" value="800">
+                    </div>
+                    <div>
+                        <label for="opexFixedBiomass" class="block text-sm font-medium text-gray-700 mb-1">资本相关运维费率 (%)</label>
+                        <input type="number" id="opexFixedBiomass" class="form-input" value="5">
+                    </div>
+                    <div>
+                        <label for="efficiencyBiomass" class="block text-sm font-medium text-gray-700 mb-1">热效率 (%)</label>
+                        <input type="number" id="efficiencyBiomass" class="form-input" value="85">
+                    </div>
+                    <!-- 新增：生物质热值输入框 -->
+                    <div>
+                        <label for="heatValueBiomass" class="block text-sm font-medium text-gray-700 mb-1">生物质颗粒热值 (kCal/kg)</label>
+                        <input type="number" id="heatValueBiomass" class="form-input" value="4000">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 计算按钮 -->
+        <button id="calculateButton" class="btn-primary">
+            开始计算
+        </button>
+    </div>
+
+    <!-- 结果显示区域 -->
+    <div id="results" class="hidden mt-10 max-w-5xl mx-auto w-full">
+        <h2 class="text-3xl font-bold text-center mb-8 text-gray-800">计算结果</h2>
+        
+        <!-- LCOH 对比图 -->
+        <div class="card p-8 mb-6">
+            <h3 class="text-2xl font-semibold text-gray-700 mb-6 border-b pb-3">LCOH (平准化供热成本) 对比</h3>
+            <div id="chart-container" class="relative" style="height: 400px;">
+                <canvas id="lcohChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 关键指标 -->
+        <div id="price-ratio-container" class="hidden card p-6 mb-6">
+            <h3 class="text-2xl font-semibold text-gray-700 mb-4">关键指标</h3>
+            <div id="price-ratio-output" class="text-lg text-gray-800"></div>
+        </div>
+
+        <!-- VDI 2067 方法论注释 -->
+        <div id="vdi-note" class="card p-6 mb-6 text-sm text-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">计算方法论 (VDI 2067 & 4645)</h3>
+            <p>本计算器遵循德国工程师协会 VDI 标准的核心原则：</p>
+            <ul class="list-disc list-inside mt-2 space-y-1">
+                <li><strong>VDI 2067 (经济性):</strong> 提供 LCOH (平准化供热成本) 的“年金法”计算框架，包含资本相关成本和运行相关成本。</li>
+                <li><strong>VDI 4645 (工业热泵):</strong> 用于指导工业热泵的 SPF (全年综合性能系数) 的估算，作为 VDI 2067 框架的关键输入参数。</li>
+                <li><strong>LCOH (平准化供热成本):</strong> 年均总成本 / 年总供热需求。</li>
+            </ul>
+        </div>
+
+        <!-- 详细数据表 -->
+        <div class="card p-8">
+            <h3 class="text-2xl font-semibold text-gray-700 mb-6 border-b pb-3">详细数据表</h3>
+            <div class="overflow-x-auto">
+                <table id="resultsTable" class="w-full min-w-max text-left">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="py-3 px-4 font-semibold text-gray-600">技术方案</th>
+                            <th class="py-3 px-4 font-semibold text-gray-600">LCOH (元/kWh)</th>
+                            <th class="py-3 px-4 font-semibold text-gray-600">年均总成本 (元)</th>
+                            <th class="py-3 px-4 font-semibold text-gray-600">年均投资成本 (元)</th>
+                            <th class="py-3 px-4 font-semibold text-gray-600">年均资本运维 (元)</th>
+                            <th class="py-3 px-4 font-semibold text-gray-600">年均运行成本 (元)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <!-- 数据将通过JS动态插入 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- Chart.js 全局配置 ---
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.font.size = 13;
+
+    // --- 折叠面板逻辑 ---
+    document.querySelectorAll('.accordion-toggle').forEach(button => {
+        button.addEventListener('click', () => {
+            const targetId = button.getAttribute('data-target');
+            const target = document.querySelector(targetId);
+            const icon = button.querySelector('span');
+            
+            if (target.style.display === 'none' || target.style.display === '') {
+                target.style.display = 'grid'; // 或 'block'
+                if(icon) icon.style.transform = 'rotate(180deg)';
+            } else {
+                target.style.display = 'none';
+                if(icon) icon.style.transform = 'rotate(0deg)';
+            }
+        });
+    });
+
+    // --- 复选框联动折叠面板 ---
+    function setupCheckboxToggle(checkboxId, targetId) {
+        const checkbox = document.getElementById(checkboxId);
+        const target = document.querySelector(targetId);
+        const toggleButton = target.previousElementSibling.querySelector('.accordion-toggle');
+        
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                target.style.display = 'grid';
+                if(toggleButton) {
+                    const icon = toggleButton.querySelector('span');
+                    if(icon) icon.style.transform = 'rotate(180deg)';
+                }
+            }
+        });
+    }
+    setupCheckboxToggle('includeGas', '#params-gas');
+    setupCheckboxToggle('includeBiomass', '#params-biomass');
+
+    // --- 计算按钮事件 ---
+    document.getElementById('calculateButton').addEventListener('click', calculateLCOH);
+
+    // --- LCOH 主计算函数 ---
+    function calculateLCOH() {
+        // --- 1. 获取通用参数 ---
+        const annualHeatDemand = parseFloat(document.getElementById('annualHeatDemand').value); // kWh
+        const lifespan = parseInt(document.getElementById('lifespan').value); // 年
+        const discountRate = parseFloat(document.getElementById('discountRate').value) / 100;
+        const operationDays = parseFloat(document.getElementById('operationDays').value);
+        const dailyHours = parseFloat(document.getElementById('dailyHours').value);
+        const annualHours = operationDays * dailyHours; // 年运行小时数
+        
+        // 检查满负荷小时数是否为0
+        if (annualHours <= 0 || annualHeatDemand <= 0) {
+            // 在实际应用中，这里应该显示一个更友好的错误提示，而不是alert
+            console.error("年运行小时数或年总供热需求必须大于0");
+            // 您可以在页面上创建一个错误提示区域来显示此消息
+            return; 
+        }
+        
+        // 计算峰值热负荷 (kW) = 总热量 / 运行小时数
+        const peakHeatLoad = annualHeatDemand / annualHours;
+
+        // --- 2. 获取能源价格 ---
+        const electricityPrice = parseFloat(document.getElementById('electricityPrice').value); // 元/kWh
+        const gasPrice = parseFloat(document.getElementById('gasPrice').value); // 元/m³
+        const biomassPrice = parseFloat(document.getElementById('biomassPrice').value); // 元/kg
+
+        // --- 3. 获取能源热值 ---
+        const heatValueElectricity = 860.4; // kCal/kWh (标准物理常数)
+        const heatValueGas = parseFloat(document.getElementById('heatValueGas').value);         // kCal/m³
+        const heatValueBiomass = parseFloat(document.getElementById('heatValueBiomass').value);    // kCal/kg
+        
+        // 检查热值是否有效 (电热值已固定，无需检查)
+        
+        // --- 4. 计算各能源的单位热值价格 (元/kWh_raw) ---
+        
+        // 转换因子 (将 kCal 统一到 kWh)
+        const kCal_to_kWh = 1 / heatValueElectricity; // 1 kCal = (1 / heatValueElectricity) kWh
+
+        // 电: 价格已经是 元/kWh
+        const pricePer_kWh_Electricity = electricityPrice;
+        
+        // 天然气: (元/m³) / (kWh/m³) = 元/kWh
+        // (heatValueGas kCal/m³ * kCal_to_kWh kWh/kCal) = kWh/m³
+        const pricePer_kWh_Gas = (heatValueGas > 0 && kCal_to_kWh > 0) ? gasPrice / (heatValueGas * kCal_to_kWh) : 0;
+        
+        // 生物质: (元/kg) / (kWh/kg) = 元/kWh
+        // (heatValueBiomass kCal/kg * kCal_to_kWh kWh/kCal) = kWh/kg
+        const pricePer_kWh_Biomass = (heatValueBiomass > 0 && kCal_to_kWh > 0) ? biomassPrice / (heatValueBiomass * kCal_to_kWh) : 0;
+
+
+        // --- 5. 计算CRF (资本回收系数 / 年金因子) ---
+        const crf = (discountRate * Math.pow(1 + discountRate, lifespan)) / (Math.pow(1 + discountRate, lifespan) - 1);
+
+        const results = [];
+        const labels = [];
+        const data = [];
+
+        // --- 6. 计算各技术方案的 LCOH ---
+
+        // 方案 1: 电热锅炉
+        const capCostElectric_per_kW = parseFloat(document.getElementById('capCostElectric').value);
+        const totalCapCostElectric = capCostElectric_per_kW * peakHeatLoad;
+        const opexFixedRateElectric = parseFloat(document.getElementById('opexFixedElectric').value) / 100;
+        const efficiencyElectric = parseFloat(document.getElementById('efficiencyElectric').value) / 100;
+
+        const annualCapCostElectric = totalCapCostElectric * crf;
+        const annualOpexCapTiedElectric = totalCapCostElectric * opexFixedRateElectric; // 资本相关运维
+        const annualOpexOpTiedElectric = (pricePer_kWh_Electricity / efficiencyElectric) * annualHeatDemand; // 运行相关成本
+        const annualCostElectric = annualCapCostElectric + annualOpexCapTiedElectric + annualOpexOpTiedElectric;
+        const lcohElectric = annualCostElectric / annualHeatDemand;
+
+        labels.push('电热锅炉');
+        data.push(lcohElectric.toFixed(4));
+        results.push({
+            name: '电热锅炉',
+            lcoh: lcohElectric.toFixed(4),
+            annualCost: annualCostElectric.toFixed(2),
+            annualCapCost: annualCapCostElectric.toFixed(2),
+            annualOpexCapTied: annualOpexCapTiedElectric.toFixed(2),
+            annualOpexOpTied: annualOpexOpTiedElectric.toFixed(2)
+        });
+
+        // 方案 2: 工业热泵 A (余热回收)
+        const capCostIndHpA_per_kW = parseFloat(document.getElementById('capCostIndHpA').value);
+        const totalCapCostIndHpA = capCostIndHpA_per_kW * peakHeatLoad;
+        const opexFixedRateIndHpA = parseFloat(document.getElementById('opexFixedIndHpA').value) / 100;
+        const spfIndHpA = parseFloat(document.getElementById('spfIndHpA').value);
+
+        const annualCapCostIndHpA = totalCapCostIndHpA * crf;
+        const annualOpexCapTiedIndHpA = totalCapCostIndHpA * opexFixedRateIndHpA;
+        const annualOpexOpTiedIndHpA = (pricePer_kWh_Electricity / spfIndHpA) * annualHeatDemand;
+        const annualCostIndHpA = annualCapCostIndHpA + annualOpexCapTiedIndHpA + annualOpexOpTiedIndHpA;
+        const lcohIndHpA = annualCostIndHpA / annualHeatDemand;
+
+        labels.push('工业热泵 A');
+        data.push(lcohIndHpA.toFixed(4));
+        results.push({
+            name: '工业热泵 A',
+            lcoh: lcohIndHpA.toFixed(4),
+            annualCost: annualCostIndHpA.toFixed(2),
+            annualCapCost: annualCapCostIndHpA.toFixed(2),
+            annualOpexCapTied: annualOpexCapTiedIndHpA.toFixed(2),
+            annualOpexOpTied: annualOpexOpTiedIndHpA.toFixed(2)
+        });
+
+        // 方案 3: 工业热泵 B (环境热源)
+        const capCostIndHpB_per_kW = parseFloat(document.getElementById('capCostIndHpB').value);
+        const totalCapCostIndHpB = capCostIndHpB_per_kW * peakHeatLoad;
+        const opexFixedRateIndHpB = parseFloat(document.getElementById('opexFixedIndHpB').value) / 100;
+        const spfIndHpB = parseFloat(document.getElementById('spfIndHpB').value);
+
+        const annualCapCostIndHpB = totalCapCostIndHpB * crf;
+        const annualOpexCapTiedIndHpB = totalCapCostIndHpB * opexFixedRateIndHpB;
+        const annualOpexOpTiedIndHpB = (pricePer_kWh_Electricity / spfIndHpB) * annualHeatDemand;
+        const annualCostIndHpB = annualCapCostIndHpB + annualOpexCapTiedIndHpB + annualOpexOpTiedIndHpB;
+        const lcohIndHpB = annualCostIndHpB / annualHeatDemand;
+
+        labels.push('工业热泵 B');
+        data.push(lcohIndHpB.toFixed(4));
+        results.push({
+            name: '工业热泵 B',
+            lcoh: lcohIndHpB.toFixed(4),
+            annualCost: annualCostIndHpB.toFixed(2),
+            annualCapCost: annualCapCostIndHpB.toFixed(2),
+            annualOpexCapTied: annualOpexCapTiedIndHpB.toFixed(2),
+            annualOpexOpTied: annualOpexOpTiedIndHpB.toFixed(2)
+        });
+
+        // --- 可选方案 ---
+        const includeGas = document.getElementById('includeGas').checked;
+        const includeBiomass = document.getElementById('includeBiomass').checked;
+        let efficiencyGas = 0; // 初始化，用于后续比率计算
+
+        // 方案 4: 天然气锅炉 (如果包含)
+        if (includeGas) {
+            const capCostGas_per_kW = parseFloat(document.getElementById('capCostGas').value);
+            const totalCapCostGas = capCostGas_per_kW * peakHeatLoad;
+            const opexFixedRateGas = parseFloat(document.getElementById('opexFixedGas').value) / 100;
+            efficiencyGas = parseFloat(document.getElementById('efficiencyGas').value) / 100; // 赋值
+
+            const annualCapCostGas = totalCapCostGas * crf;
+            const annualOpexCapTiedGas = totalCapCostGas * opexFixedRateGas;
+            const annualOpexOpTiedGas = (pricePer_kWh_Gas / efficiencyGas) * annualHeatDemand;
+            const annualCostGas = annualCapCostGas + annualOpexCapTiedGas + annualOpexOpTiedGas;
+            const lcohGas = annualCostGas / annualHeatDemand;
+
+            labels.push('天然气锅炉');
+            data.push(lcohGas.toFixed(4));
+            results.push({
+                name: '天然气锅炉',
+                lcoh: lcohGas.toFixed(4),
+                annualCost: annualCostGas.toFixed(2),
+                annualCapCost: annualCapCostGas.toFixed(2),
+                annualOpexCapTied: annualOpexCapTiedGas.toFixed(2),
+                annualOpexOpTied: annualOpexOpTiedGas.toFixed(2)
+            });
+        }
+
+        // 方案 5: 生物质锅炉 (如果包含)
+        if (includeBiomass) {
+            const capCostBiomass_per_kW = parseFloat(document.getElementById('capCostBiomass').value);
+            const totalCapCostBiomass = capCostBiomass_per_kW * peakHeatLoad;
+            const opexFixedRateBiomass = parseFloat(document.getElementById('opexFixedBiomass').value) / 100;
+            const efficiencyBiomass = parseFloat(document.getElementById('efficiencyBiomass').value) / 100;
+
+            const annualCapCostBiomass = totalCapCostBiomass * crf;
+            const annualOpexCapTiedBiomass = totalCapCostBiomass * opexFixedRateBiomass;
+            const annualOpexOpTiedBiomass = (pricePer_kWh_Biomass / efficiencyBiomass) * annualHeatDemand;
+            const annualCostBiomass = annualCapCostBiomass + annualOpexCapTiedBiomass + annualOpexOpTiedBiomass;
+            const lcohBiomass = annualCostBiomass / annualHeatDemand;
+
+            labels.push('生物质锅炉');
+            data.push(lcohBiomass.toFixed(4));
+            results.push({
+                name: '生物质锅炉',
+                lcoh: lcohBiomass.toFixed(4),
+                annualCost: annualCostBiomass.toFixed(2),
+                annualCapCost: annualCapCostBiomass.toFixed(2),
+                annualOpexCapTied: annualOpexCapTiedBiomass.toFixed(2),
+                annualOpexOpTied: annualOpexOpTiedBiomass.toFixed(2)
+            });
+        }
+
+        // --- 7. 更新电气价格比 (新功能) ---
+        const priceRatioContainer = document.getElementById('price-ratio-container');
+        const priceRatioOutput = document.getElementById('price-ratio-output');
+        
+        if (includeGas && pricePer_kWh_Gas > 0) {
+            const ratio = pricePer_kWh_Electricity / pricePer_kWh_Gas;
+            const breakeven_spf_hpA = ratio * efficiencyGas; // 临界点SPF
+            
+            priceRatioOutput.innerHTML = `
+                <p><strong>电气价格比 (单位热值):</strong> <span class="text-blue-600 font-bold text-xl">${ratio.toFixed(2)}</span></p>
+                <p class="text-sm text-gray-600 mt-2">
+                    此比率 = (单位热值电价 / 单位热值天然气价)。
+                    <br>
+                    它代表了在不考虑设备效率时，电能相对于天然气能量的价格倍数。
+                    <br>
+                    <strong>运行费用对比 (工业热泵 A vs 天然气):</strong>
+                    <br>
+                    - 热泵运行费用优势临界点: SPF > (电气价格比 * 锅炉效率)
+                    <br>
+                    - 当前临界点: SPF > (${ratio.toFixed(2)} * ${efficiencyGas.toFixed(2)}) = <strong>${breakeven_spf_hpA.toFixed(2)}</strong>
+                    <br>
+                    - 您的工业热泵 A SPF 为 <strong>${spfIndHpA.toFixed(1)}</strong>。
+                    ${spfIndHpA > breakeven_spf_hpA ? 
+                        '<span class="text-green-600 font-semibold">结论：工业热泵 A 的运行费用低于天然气锅炉。</span>' : 
+                        '<span class="text-red-600 font-semibold">结论：工业热泵 A 的运行费用高于天然气锅炉。</span>'}
+                </p>
+            `;
+            priceRatioContainer.classList.remove('hidden');
+        } else {
+            priceRatioContainer.classList.add('hidden');
+            priceRatioOutput.innerHTML = '';
+        }
+
+        // --- 8. 更新表格 ---
+        const tableBody = document.getElementById('resultsTable').getElementsByTagName('tbody')[0];
+        tableBody.innerHTML = ''; // 清空旧数据
+        results.sort((a, b) => a.lcoh - b.lcoh); // 按LCOH排序
+        
+        results.forEach(r => {
+            tableBody.innerHTML += `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 font-semibold">${r.name}</td>
+                    <td class="py-3 px-4 text-red-600 font-bold text-lg">${r.lcoh}</td>
+                    <td class="py-3 px-4">${r.annualCost}</td>
+                    <td class="py-3 px-4">${r.annualCapCost}</td>
+                    <td class="py-3 px-4">${r.annualOpexCapTied}</td>
+                    <td class="py-3 px-4">${r.annualOpexOpTied}</td>
+                </tr>
+            `;
+        });
+
+        // --- 9. 更新图表 ---
+        if (window.lcohChart instanceof Chart) {
+            window.lcohChart.destroy();
+        }
+        const ctx = document.getElementById('lcohChart').getContext('2d');
+        
+        // 按LCOH对图表数据排序
+        const sortedChartData = labels.map((label, index) => ({
+            label: label,
+            value: data[index]
+        })).sort((a, b) => a.value - b.value);
+
+        const sortedLabels = sortedChartData.map(d => d.label);
+        const sortedData = sortedChartData.map(d => d.value);
+
+        window.lcohChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: sortedLabels,
+                datasets: [{
+                    label: 'LCOH (元/kWh)',
+                    data: sortedData,
+                    backgroundColor: [
+                        'rgba(54, 162, 235, 0.7)',  // 蓝色
+                        'rgba(75, 192, 192, 0.7)',  // 绿色
+                        'rgba(255, 206, 86, 0.7)', // 黄色
+                        'rgba(255, 159, 64, 0.7)', // 橙色
+                        'rgba(153, 102, 255, 0.7)', // 紫色
+                        'rgba(255, 99, 132, 0.7)'  // 红色
+                    ],
+                    borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 99, 132, 1)'
+                    ],
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'LCOH (元/kWh)',
+                            font: { size: 14, weight: 'bold' }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '供热技术 (按成本升序排列)',
+                            font: { size: 14, weight: 'bold' }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#fff',
+                        titleColor: '#333',
+                        bodyColor: '#666',
+                        borderColor: '#ddd',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: function(context) {
+                                return ` LCOH: ${context.raw} 元/kWh`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // --- 10. 显示结果 ---
+        document.getElementById('results').classList.remove('hidden');
+        // 平滑滚动到结果区域
+        document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+    }
+</script>
+</body>
+</html>
+
+
+
+
+
+
