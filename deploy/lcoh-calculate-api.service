@@ -1,0 +1,16 @@
+[Unit]
+Description=LCOH Calculator /calculate API (Open Thermal AI)
+After=network.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/opt/lcoh-calculate-api
+Environment=HOST=127.0.0.1
+Environment=PORT=9107
+ExecStart=/usr/bin/node server/calculate-api.mjs
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

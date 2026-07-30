@@ -1,0 +1,13 @@
+{
+  "name": "lcoh-calculator",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "LCOH (VDI 2067 & 4645) — Open Thermal AI /calculate API",
+  "scripts": {
+    "calculate-api": "node server/calculate-api.mjs",
+    "test:calculate-api": "node server/test-calculate-api.mjs"
+  },
+  "keywords": ["lcoh", "heat-pump", "vdi", "open-thermal-ai"],
+  "author": "荆炎荣",
+  "license": "MIT"
+}
